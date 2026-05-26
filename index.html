@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>听写训练 · Dictation Lab</title>
+<style>
+/* ========== RESET & BASE ========== */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #0f0f14;
+  --surface: #1a1a24;
+  --surface2: #24243a;
+  --border: #2e2e42;
+  --text: #e8e8f0;
+  --text2: #9898b0;
+  --text3: #686888;
+  --accent: #7c5cfc;
+  --accent-glow: #7c5cfc66;
+  --green: #34d399;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --orange: #fb923c;
+  --green-bg: #34d39918;
+  --red-bg: #f8717118;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+.app {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ========== HEADER ========== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.logo { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+.logo span { color: var(--accent); }
+.mode-switch {
+  display: flex;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font);
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.mode-btn:hover:not(.active) { color: var(--text); }
+
+/* ========== STATS BAR ========== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  text-align: center;
+}
+.stat-val { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+.stat-val.green { color: var(--green); }
+.stat-val.red { color: var(--red); }
+.stat-val.accent { color: var(--accent); }
+.stat-lbl { font-size: 0.72rem; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ========== PROGRESS ========== */
+.progress-wrap {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.progress-bar-outer {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #a78bfa);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--text2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ========== MAIN CARD ========== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sentence number */
+.sentence-num {
+  font-size: 0.78rem;
+  color: var(--text3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Audio play button */
+.play-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  position: relative;
+}
+.play-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-glow);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.play-btn:hover { transform: scale(1.06); }
+.play-btn:hover::after { opacity: 0.5; }
+.play-btn:active { transform: scale(0.96); }
+.play-btn.playing { border-color: var(--green); background: var(--green-bg); }
+.play-btn.playing::after { border-color: var(--green); opacity: 0.4; }
+.play-icon {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 14px 0 14px 24px;
+  border-color: transparent transparent transparent var(--accent);
+  margin-left: 4px;
+  transition: var(--transition);
+}
+.play-btn.playing .play-icon {
+  border-style: double;
+  border-width: 0 0 0 24px;
+  border-color: transparent transparent transparent var(--green);
+}
+.play-label {
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+
+/* Speed selector */
+.speed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.speed-row span { font-size: 0.75rem; color: var(--text3); }
+.speed-opt {
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: var(--font);
+}
+.speed-opt.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Input area */
+.input-row {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+.input-field {
+  flex: 1;
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+  transition: var(--transition);
+  letter-spacing: 0.02em;
+}
+.input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.input-field.correct { border-color: var(--green); background: var(--green-bg); }
+.input-field.wrong { border-color: var(--red); background: var(--red-bg); animation: shake 0.4s ease; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%,60% { transform: translateX(-6px); }
+  40%,80% { transform: translateX(6px); }
+}
+
+.submit-btn {
+  padding: 14px 28px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font);
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.submit-btn:hover { background: #9070ff; transform: translateY(-1px); }
+.submit-btn:active { transform: scale(0.97); }
+.submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ========== FEEDBACK AREA ========== */
+.feedback {
+  width: 100%;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition: var(--transition);
+}
+
+/* Correct feedback */
+.fb-correct {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: popIn 0.35s ease;
+}
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.fb-check {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--green-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+.fb-label { font-size: 0.95rem; font-weight: 600; color: var(--green); }
+
+/* Confetti */
+.confetti-container {
+  position: fixed; inset: 0; pointer-events: none; z-index: 999;
+}
+.confetti-piece {
+  position: absolute;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  animation: confettiFall 0.8s ease-out forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+/* Reveal button */
+.reveal-btn {
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font);
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: var(--transition);
+}
+.reveal-btn:hover { background: var(--accent); color: #fff; }
+
+/* Countdown pulse */
+.play-btn.pulse {
+  animation: pulse 0.6s ease-in-out;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 16px transparent; }
+}
+
+/* Wrong feedback */
+.fb-wrong {
+  width: 100%;
+  animation: fadeUp 0.3s ease;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.diff-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 16px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+.diff-word {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.diff-word.match { background: var(--green-bg); color: var(--green); }
+.diff-word.mismatch { background: var(--red-bg); color: var(--red); text-decoration: line-through; }
+.diff-word.extra { background: var(--red-bg); color: var(--red); }
+.diff-word.missing { background: #fbbf2418; color: var(--yellow); border-bottom: 2px dashed var(--yellow); }
+.diff-word.correct-answer { background: var(--green-bg); color: var(--green); font-weight: 700; }
+
+.retry-hint {
+  font-size: 0.82rem;
+  color: var(--text2);
+  text-align: center;
+}
+
+/* ========== COMPLETION CARD ========== */
+.complete-card {
+  text-align: center;
+  animation: popIn 0.5s ease;
+}
+.complete-emoji { font-size: 4rem; margin-bottom: 12px; }
+.complete-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
+.complete-stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin: 16px 0;
+}
+.complete-stat { text-align: center; }
+.complete-stat-val { font-size: 1.6rem; font-weight: 700; }
+.complete-stat-lbl { font-size: 0.75rem; color: var(--text3); }
+.restart-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font);
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.restart-btn:hover { background: #9070ff; }
+
+/* ========== SENTENCE PICKER (before starting) ========== */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.picker-item:hover { border-color: var(--accent); background: var(--surface2); }
+.picker-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700; color: var(--text2);
+  flex-shrink: 0;
+}
+.picker-item.done .picker-num { background: var(--green-bg); color: var(--green); }
+.picker-preview { color: var(--text2); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.start-all-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: var(--font);
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.start-all-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
+
+/* Voice picker */
+.voice-select {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font);
+  cursor: pointer;
+}
+
+/* Toast */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  padding: 12px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 1000;
+  animation: toastIn 0.3s ease, toastOut 0.3s 2.5s ease forwards;
+  pointer-events: none;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-16px); } }
+@keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(-16px); } }
+
+/* Responsive */
+@media (max-width: 480px) {
+  body { padding: 10px; }
+  .card { padding: 24px 16px; }
+  .input-row { flex-direction: column; }
+  .submit-btn { width: 100%; padding: 14px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .header { flex-direction: column; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">Dictation <span>Lab</span></div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="mode-btn active" data-mode="cet6">CET-6</button>
+      <button class="mode-btn" data-mode="tem4">TEM-4</button>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats">
+    <div class="stat-card"><div class="stat-val accent" id="statTotal">0</div><div class="stat-lbl">总数</div></div>
+    <div class="stat-card"><div class="stat-val green" id="statCorrect">0</div><div class="stat-lbl">正确</div></div>
+    <div class="stat-card"><div class="stat-val red" id="statWrong">0</div><div class="stat-lbl">错误</div></div>
+    <div class="stat-card"><div class="stat-val" id="statStreak" style="color:#fbbf24">0</div><div class="stat-lbl">连对</div></div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-bar-outer"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+    <div class="progress-text" id="progressText">0 / 0</div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="mainArea"></div>
+
+  <!-- SPEED & VOICE ROW (footer of card) -->
+</div>
+
+<script>
+// ========== QUESTION BANK ==========
+// Real CET-6 & TEM-4 exam listening passages, extracted from past papers
+// Each sentence: { text, year, source }
+
+const QUESTION_BANKS = {
+  cet6: {
+    title: 'CET-6 听力真题 · 短文理解',
+    sentences: [
+      // ===== 2013年6月 · Passage 1: Robotic Parking =====
+      { text: "Would you trust a robot to park your car?", year:"2013.6", source:"Passage 1" },
+      { text: "The question will confront New Yorkers in February as the city's first robotic parking opens in Chinatown.", year:"2013.6", source:"Passage 1" },
+      { text: "The technology has been successfully applied overseas, but the only other public robotic garage in the United States has been troublesome, dropping vehicles and trapping cars because of technical problems.", year:"2013.6", source:"Passage 1" },
+      { text: "Nonetheless, the developers of the Chinatown garage are confident with the technology and are counting on it to squeeze 67 cars in an apartment-building basement that would otherwise fit only 24, accomplished by removing a maneuver space normally required.", year:"2013.6", source:"Passage 1" },
+      { text: "A human-shaped robot won't be stepping into your car to drive it.", year:"2013.6", source:"Passage 1" },
+      { text: "Rather, the garage itself does the parking.", year:"2013.6", source:"Passage 1" },
+      { text: "The driver stops the car on a flat platform and gets out.", year:"2013.6", source:"Passage 1" },
+      { text: "The platform is lowered into the garage, and it is then transported to a vacant parking space by a computer-controlled device similar to an elevator that also runs sideways.", year:"2013.6", source:"Passage 1" },
+      { text: "There is no human supervision, but an attendant will be on hand to accept cash and explain the system to new users.", year:"2013.6", source:"Passage 1" },
+      { text: "Parking rates will be attractive, about 400 monthly or 25 per day, according to Ari Milstein, the director of planning for Automation Parking Systems, which is the US subsidiary of a German company.", year:"2013.6", source:"Passage 1" },
+      { text: "This company has built automated garages in several countries overseas and in the United States for residents of a Washington, D.C. apartment building.", year:"2013.6", source:"Passage 1" },
+
+      // ===== 2013年6月 · Passage 2: Meat Consumption & Environment =====
+      { text: "A recent study shows that meat consumption is one of the main ways that humans can damage the environment, second only to the use of motor vehicles.", year:"2013.6", source:"Passage 2" },
+      { text: "So, how can eating meat have a negative effect on the environment?", year:"2013.6", source:"Passage 2" },
+      { text: "For a start, all animals, such as cows, pigs and sheep, release a gas named methane, which is the second most common greenhouse gas after carbon dioxide.", year:"2013.6", source:"Passage 2" },
+      { text: "Many environmental experts now believe that methane is more responsible for global warming than carbon dioxide.", year:"2013.6", source:"Passage 2" },
+      { text: "It is estimated that 25% of all methane released into the atmosphere comes from farm animals.", year:"2013.6", source:"Passage 2" },
+      { text: "Another way in which meat production affects the environment is through the use of water and land.", year:"2013.6", source:"Passage 2" },
+      { text: "2,500 gallons of water are needed to produce one pound of beef, whereas 20 gallons of water are needed to produce one pound of wheat.", year:"2013.6", source:"Passage 2" },
+      { text: "One acre of farmland used for raising cows can produce 250 pounds of beef.", year:"2013.6", source:"Passage 2" },
+      { text: "One acre of farmland used for crop production can produce 50,000 pounds of tomatoes.", year:"2013.6", source:"Passage 2" },
+      { text: "Many people now see the benefits of switching to a vegetarian diet which excludes meat and fish, not just for health reasons, but also because it plays a vital role in protecting the environment.", year:"2013.6", source:"Passage 2" },
+      { text: "However, some nutritionists advise against switching to a totally strict vegetarian diet.", year:"2013.6", source:"Passage 2" },
+      { text: "They believe such a diet which includes no products from animal sources can be deficient in many of the necessary vitamins and minerals our bodies need.", year:"2013.6", source:"Passage 2" },
+      { text: "Today many people have come to realize that to help the environment and for the human race to survive, more of us will need to become vegetarian.", year:"2013.6", source:"Passage 2" },
+
+      // ===== 2013年6月 · Passage 3: Alcoholism =====
+      { text: "Alcoholism is a serious disease.", year:"2013.6", source:"Passage 3" },
+      { text: "Nearly nine million Americans alone suffer from the illness.", year:"2013.6", source:"Passage 3" },
+      { text: "Many scientists disagree about what the differences are between an alcohol addict and a social drinker.", year:"2013.6", source:"Passage 3" },
+      { text: "The difference occurs when someone needs to drink.", year:"2013.6", source:"Passage 3" },
+      { text: "And this need gets in the way of his health or behavior.", year:"2013.6", source:"Passage 3" },
+      { text: "Alcohol causes a loss of judgment and alertness.", year:"2013.6", source:"Passage 3" },
+      { text: "After a long period, alcoholism can deteriorate the liver, the brain and other parts of the body.", year:"2013.6", source:"Passage 3" },
+      { text: "The illness is dangerous, because it is involved in half of all automobile accidents.", year:"2013.6", source:"Passage 3" },
+      { text: "Another problem is that the victim often denies being an alcohol addict and won't get help.", year:"2013.6", source:"Passage 3" },
+      { text: "Solutions do exist.", year:"2013.6", source:"Passage 3" },
+      { text: "Many hospitals and centers help patients cope.", year:"2013.6", source:"Passage 3" },
+      { text: "Without assistance, the victim can destroy his life.", year:"2013.6", source:"Passage 3" },
+      { text: "He would detach himself from the routines of life.", year:"2013.6", source:"Passage 3" },
+      { text: "He may lose his employment, home or loved ones.", year:"2013.6", source:"Passage 3" },
+      { text: "All the causes of the sickness are not discovered yet.", year:"2013.6", source:"Passage 3" },
+      { text: "There is no standard for a person with alcoholism.", year:"2013.6", source:"Passage 3" },
+      { text: "Victims range in age, race, sex and background.", year:"2013.6", source:"Passage 3" },
+      { text: "Some groups of people are more vulnerable to the illness.", year:"2013.6", source:"Passage 3" },
+      { text: "People from broken homes and North American Indians are two examples.", year:"2013.6", source:"Passage 3" },
+      { text: "People from broken homes often lack stable lives.", year:"2013.6", source:"Passage 3" },
+      { text: "Indians, likewise, had their traditional life taken from them by white settlers who often encourage them to consume alcohol to prevent them from fighting back.", year:"2013.6", source:"Passage 3" },
+      { text: "The problem has now been passed on.", year:"2013.6", source:"Passage 3" },
+      { text: "Alcoholism is clearly present in society today.", year:"2013.6", source:"Passage 3" },
+      { text: "People have started to get help and information.", year:"2013.6", source:"Passage 3" },
+      { text: "With proper assistance, victims can put their lives together one day.", year:"2013.6", source:"Passage 3" },
+
+      // ===== 2013年6月 · Section C: Self-image (Compound Dictation) =====
+      { text: "Self-image is the picture you have of yourself, the sort of person you believe you are.", year:"2013.6", source:"Section C" },
+      { text: "Included in your self-image are the categories in which you place yourself, the roles you play, and other similar descriptors you use to identify yourself.", year:"2013.6", source:"Section C" },
+      { text: "If you tell an acquaintance you are a grandfather who recently lost his wife and who does volunteer work on weekends, several elements of your self-image are brought to light: the roles of grandparent, widower, and conscientious citizen.", year:"2013.6", source:"Section C" },
+      { text: "But self-image is more than how you picture yourself; it also involves how others see you.", year:"2013.6", source:"Section C" },
+      { text: "Three types of feedback from others are indicative of how they see us: confirmation, rejection, and disconfirmation.", year:"2013.6", source:"Section C" },
+      { text: "Confirmation occurs when others treat you in a manner consistent with who you believe you are.", year:"2013.6", source:"Section C" },
+      { text: "You believe you have leadership abilities and your boss put you in charge of a new work team.", year:"2013.6", source:"Section C" },
+      { text: "On the other hand, rejection occurs when others treat you in a manner that is inconsistent with your self-definition.", year:"2013.6", source:"Section C" },
+      { text: "Pierre Salinger was appointed senator from California but subsequently lost his first election.", year:"2013.6", source:"Section C" },
+      { text: "He thought he was a good public official, but the voters obviously thought otherwise: their vote was inconsistent with his self-concept.", year:"2013.6", source:"Section C" },
+      { text: "The third type of feedback is disconfirmation, which occurs when others fail to respond to your notion of self by responding neutrally.", year:"2013.6", source:"Section C" },
+      { text: "A student writes what he thinks is an excellent composition, but the teacher writes no encouraging remarks.", year:"2013.6", source:"Section C" },
+      { text: "Rather than relying on how others classify you, consider how you identify yourself.", year:"2013.6", source:"Section C" },
+      { text: "The way in which you identify yourself is the best reflection of your self-image.", year:"2013.6", source:"Section C" },
+    ]
+  },
+  tem4: {
+    title: 'TEM-4 专四听写 · 真题',
+    sentences: [
+      // Placeholder - TEM-4 dictation passages to be added when sourced
+      { text: "Reading is one of the most rewarding habits a person can develop.", year:"样题", source:"专四听写" },
+      { text: "It opens doors to new worlds and introduces us to different perspectives.", year:"样题", source:"专四听写" },
+      { text: "Regular readers tend to have larger vocabularies and better writing skills.", year:"样题", source:"专四听写" },
+      { text: "Studies have shown that reading can reduce stress and improve mental health.", year:"样题", source:"专四听写" },
+      { text: "Fiction, in particular, helps develop empathy by allowing us to experience others' lives.", year:"样题", source:"专四听写" },
+      { text: "In our digital age, the habit of deep reading is becoming increasingly rare.", year:"样题", source:"专四听写" },
+      { text: "Many people now prefer short articles and social media posts over lengthy books.", year:"样题", source:"专四听写" },
+      { text: "But the benefits of sustained, focused reading cannot be replicated by skimming online content.", year:"样题", source:"专四听写" },
+      { text: "Parents can encourage their children to read by setting a good example themselves.", year:"样题", source:"专四听写" },
+      { text: "Even just fifteen minutes of reading each day can make a profound difference over time.", year:"样题", source:"专四听写" },
+      { text: "Travel broadens the mind and enriches the soul in countless ways.", year:"样题", source:"专四听写" },
+      { text: "When we visit foreign countries, we encounter customs and traditions different from our own.", year:"样题", source:"专四听写" },
+      { text: "These experiences challenge our assumptions and help us grow as individuals.", year:"样题", source:"专四听写" },
+      { text: "Trying local cuisine is often one of the most memorable parts of any journey.", year:"样题", source:"专四听写" },
+      { text: "Language barriers can be frustrating, but they also lead to memorable and humorous moments.", year:"样题", source:"专四听写" },
+    ]
+  }
+};
+
+// ========== APP STATE ==========
+const STORAGE_KEY = 'dictation-lab-state';
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved && saved.mode && Array.isArray(saved.done)) {
+      return {
+        ...saved,
+        sentenceDone: new Set(saved.done),
+        speechRate: saved.speechRate || 0.85,
+      };
+    }
+  } catch(e) {}
+  return null;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      mode: state.mode,
+      done: [...state.sentenceDone],
+      correctCount: state.correctCount,
+      wrongCount: state.wrongCount,
+      maxStreak: state.maxStreak,
+      speechRate: state.speechRate,
+    }));
+  } catch(e) {}
+}
+
+const saved = loadState();
+const state = {
+  mode: saved?.mode || 'cet6',
+  sentences: [],
+  currentIdx: 0,
+  correctCount: saved?.correctCount || 0,
+  wrongCount: saved?.wrongCount || 0,
+  streak: 0,
+  maxStreak: saved?.maxStreak || 0,
+  feedbackShown: false,
+  isCorrect: false,
+  wrongAttempts: 0,
+  speechRate: saved?.speechRate || 0.85,
+  voice: null,
+  voices: [],
+  sentenceDone: saved?.sentenceDone || new Set(),
+  maxWrongBeforeReveal: 3,
+};
+
+// ========== DOM REFS ==========
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+// ========== TTS ==========
+function getVoice() {
+  if (state.voice) return state.voice;
+  const voices = speechSynthesis.getVoices();
+  // Prefer English voices with good quality
+  const preferred = voices.filter(v => 
+    v.lang.startsWith('en') && 
+    (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Microsoft') || v.name.includes('Natural'))
+  );
+  if (preferred.length) return preferred[0];
+  const enVoices = voices.filter(v => v.lang.startsWith('en'));
+  if (enVoices.length) return enVoices[0];
+  return voices[0];
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+    speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.voice = state.voice || getVoice();
+    utt.rate = state.speechRate;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
+    utt.onend = resolve;
+    utt.onerror = resolve;
+    speechSynthesis.speak(utt);
+  });
+}
+
+// ========== DIFF ENGINE ==========
+function normalize(text) {
+  return text.replace(/[.,!?;:'\"()\-—]+/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function diffWords(correct, user) {
+  const cWords = normalize(correct).split(' ');
+  const uWords = normalize(user).split(' ');
+  
+  // Use LCS-based diff
+  const m = cWords.length, n = uWords.length;
+  const dp = Array.from({length: m+1}, () => Array(n+1).fill(0));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = cWords[i-1] === uWords[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  
+  // Backtrack
+  const result = [];
+  let i = m, j = n;
+  const bt = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && cWords[i-1] === uWords[j-1]) {
+      bt.unshift({ type: 'match', cWord: cWords[i-1], uWord: uWords[j-1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+      bt.unshift({ type: 'extra', uWord: uWords[j-1] });
+      j--;
+    } else {
+      bt.unshift({ type: 'mismatch', cWord: cWords[i-1], uWord: j > 0 ? uWords[j-1] : null });
+      i--;
+    }
+  }
+  
+  // Build with missing markers
+  const display = [];
+  let ci = 0;
+  for (const item of bt) {
+    if (item.type === 'match') {
+      display.push({ type: 'match', word: item.cWord });
+      ci++;
+    } else if (item.type === 'extra') {
+      display.push({ type: 'extra', word: item.uWord });
+    } else if (item.type === 'mismatch') {
+      // Show what user typed (wrong) + what was correct
+      if (item.uWord) display.push({ type: 'mismatch', word: item.uWord });
+      display.push({ type: 'missing', word: item.cWord });
+      ci++;
+    }
+  }
+  
+  return { display, isExactMatch: m === n && cWords.every((w, i) => w === uWords[i]) };
+}
+
+// ========== RENDER ==========
+function loadVoices() {
+  state.voices = speechSynthesis.getVoices();
+  state.voice = getVoice();
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function updateStats() {
+  const total = state.correctCount + state.wrongCount;
+  $('#statTotal').textContent = state.sentences.length;
+  $('#statCorrect').textContent = state.correctCount;
+  $('#statWrong').textContent = state.wrongCount;
+  $('#statStreak').textContent = state.maxStreak;
+  const pct = state.sentences.length ? Math.round((state.sentenceDone.size / state.sentences.length) * 100) : 0;
+  $('#progressBar').style.width = pct + '%';
+  $('#progressText').textContent = `${state.sentenceDone.size} / ${state.sentences.length}`;
+}
+
+function showPicker() {
+  const sentences = state.sentences;
+  const doneCount = state.sentenceDone.size;
+  const html = `
+    <div class="card">
+      <div style="text-align:center; margin-bottom:4px;">
+        <div style="font-size:1.1rem; font-weight:700;">${QUESTION_BANKS[state.mode].title}</div>
+        <div style="font-size:0.8rem; color:var(--text3); margin-top:4px;">
+          共 ${sentences.length} 句 · 已完成 ${doneCount} 句
+          ${doneCount > 0 ? `(${Math.round(doneCount/sentences.length*100)}%)` : ''}
+        </div>
+      </div>
+      <div class="picker">
+        ${sentences.map((s, i) => `
+          <div class="picker-item ${state.sentenceDone.has(i) ? 'done' : ''}" onclick="startFrom(${i})">
+            <div class="picker-num">${state.sentenceDone.has(i) ? '✓' : i+1}</div>
+            <div class="picker-preview">${s.year ? '[' + s.year + '] ' : ''}${s.source ? s.source + ': ' : ''}${s.text.slice(0, 45)}...</div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="start-all-btn" onclick="startFromFirstUndone()">
+        ${doneCount === 0 ? '▶ 开始挑战' : doneCount === sentences.length ? '✓ 全部完成！重新挑战' : `▶ 继续挑战（剩余 ${sentences.length - doneCount} 句）`}
+      </button>
+      <div style="font-size:0.72rem; color:var(--text3); text-align:center; margin-top:12px;">
+        快捷键：Space 播放 · Enter 提交 · → 下一句
+      </div>
+    </div>
+  `;
+  $('#mainArea').innerHTML = html;
+  updateStats();
+}
+
+function startFromFirstUndone() {
+  for (let i = 0; i < state.sentences.length; i++) {
+    if (!state.sentenceDone.has(i)) { startFrom(i); return; }
+  }
+  // All done - restart
+  restartChallenge();
+}
+
+function startFrom(idx) {
+  state.currentIdx = idx;
+  state.feedbackShown = false;
+  state.wrongAttempts = 0;
+  renderExercise();
+  // Auto-play after render
+  setTimeout(() => handlePlay(), 500);
+}
+
+function renderExercise() {
+  const s = state.sentences[state.currentIdx];
+  if (!s) { renderComplete(); return; }
+  
+  const done = state.sentenceDone.has(state.currentIdx);
+  const disabled = done ? 'disabled' : '';
+  const feedbackHTML = state.feedbackShown ? renderFeedback() : '';
+  
+  const voiceOptions = state.voices
+    .filter(v => v.lang.startsWith('en'))
+    .slice(0, 12)
+    .map(v => `<option value="${v.name}" ${(state.voice && state.voice.name === v.name) ? 'selected' : ''}>${v.name.replace('Microsoft ','').replace('Google ','')}</option>`)
+    .join('');
+  
+  const html = `
+    <div class="card">
+      <div class="sentence-num">${state.mode.toUpperCase()} · 第 ${state.currentIdx + 1} / ${state.sentences.length} 句${s.source ? ' · ' + s.source : ''}${s.year ? ' (' + s.year + ')' : ''}</div>
+      
+      <button class="play-btn" id="playBtn" onclick="handlePlay()" ${disabled}>
+        <div class="play-icon"></div>
+      </button>
+      <div class="play-label">点击播放 / 按 Space 重播</div>
+      
+      <div class="speed-row">
+        <span>语速</span>
+        ${[0.65, 0.8, 0.95, 1.1].map(r => `
+          <button class="speed-opt ${Math.abs(state.speechRate - r) < 0.01 ? 'active' : ''}" onclick="setSpeed(${r})">${r}x</button>
+        `).join('')}
+        <select class="voice-select" onchange="setVoice(this.value)">${voiceOptions}</select>
+      </div>
+      
+      <div class="input-row">
+        <input class="input-field" id="inputField" type="text" 
+          placeholder="在这里输入你听到的内容..." 
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          ${disabled}>
+        <button class="submit-btn" id="submitBtn" onclick="handleSubmit()" ${disabled}>提交</button>
+      </div>
+      
+      ${feedbackHTML ? `<div class="feedback">${feedbackHTML}</div>` : ''}
+      
+      ${done ? `
+        <div style="display:flex;gap:10px;width:100%;">
+          <button class="restart-btn" style="flex:1" onclick="nextSentence()">下一句 →</button>
+        </div>
+      ` : (state.feedbackShown && !state.isCorrect && state.wrongAttempts >= state.maxWrongBeforeReveal ? `
+        <button class="reveal-btn" onclick="revealAnswer()">💡 太多次了，显示答案</button>
+      ` : '')}
+    </div>
+  `;
+  
+  $('#mainArea').innerHTML = html;
+  updateStats();
+  
+  // Focus input
+  const input = $('#inputField');
+  if (input && !disabled) setTimeout(() => input.focus(), 100);
+  
+  // Keyboard handlers
+  if (!done) {
+    document.onkeydown = handleKeydown;
+  }
+}
+
+function renderFeedback() {
+  if (state.isCorrect) {
+    const msgs = ['太棒了！', '完全正确！', '厉害！', '满分！', '完美！', '没错！'];
+    const msg = msgs[Math.floor(Math.random() * msgs.length)];
+    return `
+      <div class="fb-correct">
+        <div class="fb-check">✓</div>
+        <div class="fb-label">${msg}</div>
+      </div>
+    `;
+  } else {
+    const correct = state.sentences[state.currentIdx].text;
+    const userInput = $('#inputField')?.value || '';
+    const { display } = diffWords(correct, userInput);
+    
+    return `
+      <div class="fb-wrong">
+        <div style="font-size:0.9rem; font-weight:600; color:var(--red); margin-bottom:8px;">✗ 有差异，看看哪里不对：</div>
+        <div class="diff-row">
+          ${display.map(d => {
+            if (d.type === 'match') return `<span class="diff-word match">${d.word}</span>`;
+            if (d.type === 'mismatch') return `<span class="diff-word mismatch">${d.word}</span>`;
+            if (d.type === 'extra') return `<span class="diff-word extra">${d.word}</span>`;
+            if (d.type === 'missing') return `<span class="diff-word missing">${d.word}</span>`;
+            return '';
+          }).join(' ')}
+        </div>
+        <div style="margin-top:8px; font-size:0.82rem; color:var(--text2);">
+          <div>正确答案：<span style="color:var(--green); font-weight:600;">${correct}</span></div>
+        </div>
+        <div class="retry-hint" style="margin-top:10px;">修改后按 Enter 重试，或按 → 跳过</div>
+      </div>
+    `;
+  }
+}
+
+function renderComplete() {
+  const total = state.sentences.length;
+  const correct = state.correctCount;
+  const pct = total ? Math.round((correct / total) * 100) : 0;
+  const emoji = pct >= 90 ? '🎉' : pct >= 70 ? '👍' : pct >= 50 ? '💪' : '📚';
+  const title = pct >= 90 ? '太厉害了！' : pct >= 70 ? '表现不错！' : pct >= 50 ? '继续加油！' : '多多练习！';
+  
+  const html = `
+    <div class="card">
+      <div class="complete-card">
+        <div class="complete-emoji">${emoji}</div>
+        <div class="complete-title">${title}</div>
+        <div style="color:var(--text2); margin-bottom:12px;">${QUESTION_BANKS[state.mode].title} · 完成</div>
+        <div class="complete-stats">
+          <div class="complete-stat"><div class="complete-stat-val" style="color:var(--green)">${correct}</div><div class="complete-stat-lbl">正确</div></div>
+          <div class="complete-stat"><div class="complete-stat-val" style="color:var(--red)">${state.wrongCount}</div><div class="complete-stat-lbl">错误</div></div>
+          <div class="complete-stat"><div class="complete-stat-val" style="color:var(--accent)">${pct}%</div><div class="complete-stat-lbl">正确率</div></div>
+          <div class="complete-stat"><div class="complete-stat-val" style="color:#fbbf24">${state.maxStreak}</div><div class="complete-stat-lbl">最长连对</div></div>
+        </div>
+        <button class="restart-btn" onclick="restartChallenge()">再来一次</button>
+        <button class="restart-btn" style="background:var(--surface2); margin-left:10px;" onclick="switchMode(state.mode)">返回列表</button>
+      </div>
+    </div>
+  `;
+  $('#mainArea').innerHTML = html;
+  document.onkeydown = null;
+}
+
+// ========== ACTIONS ==========
+async function handlePlay() {
+  const btn = $('#playBtn');
+  if (!btn) return;
+  btn.classList.add('playing');
+  await speak(state.sentences[state.currentIdx].text);
+  btn.classList.remove('playing');
+}
+
+function setSpeed(rate) {
+  state.speechRate = rate;
+  renderExercise();
+}
+
+function setVoice(name) {
+  state.voice = state.voices.find(v => v.name === name) || null;
+}
+
+function handleSubmit() {
+  if (state.feedbackShown && state.isCorrect) return;
+  
+  const input = $('#inputField');
+  const userText = input.value.trim();
+  if (!userText) return;
+  
+  const correct = state.sentences[state.currentIdx].text;
+  const userNorm = normalize(userText);
+  const correctNorm = normalize(correct);
+  
+  if (userNorm === correctNorm) {
+    // CORRECT
+    state.isCorrect = true;
+    state.feedbackShown = true;
+    state.correctCount++;
+    state.streak++;
+    if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+    state.wrongAttempts = 0;
+    state.sentenceDone.add(state.currentIdx);
+    saveState();
+    
+    input.classList.add('correct');
+    input.classList.remove('wrong');
+    input.disabled = true;
+    $('#submitBtn').disabled = true;
+    
+    renderExercise();
+    spawnConfetti();
+    
+    // Auto-advance after 1.4s
+    setTimeout(() => {
+      if (state.currentIdx < state.sentences.length - 1) {
+        nextSentence();
+      }
+    }, 1400);
+  } else {
+    // WRONG
+    state.isCorrect = false;
+    state.feedbackShown = true;
+    state.streak = 0;
+    state.wrongAttempts++;
+    if (state.wrongAttempts === 1) state.wrongCount++;
+    saveState();
+    
+    input.classList.add('wrong');
+    input.classList.remove('correct');
+    
+    renderExercise();
+    
+    // Re-focus input after render
+    setTimeout(() => {
+      const newInput = $('#inputField');
+      if (newInput) { 
+        newInput.focus(); 
+        newInput.select();
+      }
+    }, 150);
+  }
+}
+
+function revealAnswer() {
+  const correct = state.sentences[state.currentIdx].text;
+  const input = $('#inputField');
+  if (input) {
+    input.value = correct;
+    input.classList.add('correct');
+    input.classList.remove('wrong');
+  }
+  // Mark as done with reveal
+  state.sentenceDone.add(state.currentIdx);
+  state.correctCount++;
+  state.feedbackShown = true;
+  state.isCorrect = true;
+  state.wrongAttempts = 0;
+  saveState();
+  renderExercise();
+}
+
+function spawnConfetti() {
+  const container = document.createElement('div');
+  container.className = 'confetti-container';
+  const colors = ['#7c5cfc','#34d399','#fbbf24','#f87171','#60a5fa','#f472b6','#818cf8'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + '%';
+    piece.style.top = -(Math.random() * 80 + 20) + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = Math.random() * 0.3 + 's';
+    piece.style.width = (Math.random() * 8 + 6) + 'px';
+    piece.style.height = (Math.random() * 8 + 6) + 'px';
+    container.appendChild(piece);
+  }
+  document.body.appendChild(container);
+  setTimeout(() => container.remove(), 1200);
+}
+
+function nextSentence() {
+  let next = state.currentIdx + 1;
+  while (next < state.sentences.length && state.sentenceDone.has(next)) next++;
+  
+  if (next >= state.sentences.length) {
+    // All done
+    renderComplete();
+  } else {
+    state.currentIdx = next;
+    state.feedbackShown = false;
+    state.isCorrect = false;
+    state.wrongAttempts = 0;
+    renderExercise();
+    // Auto-play
+    setTimeout(() => handlePlay(), 400);
+  }
+}
+
+function restartChallenge() {
+  state.currentIdx = 0;
+  state.correctCount = 0;
+  state.wrongCount = 0;
+  state.streak = 0;
+  state.maxStreak = 0;
+  state.feedbackShown = false;
+  state.isCorrect = false;
+  state.wrongAttempts = 0;
+  state.sentenceDone = new Set();
+  saveState();
+  startFrom(0);
+}
+
+function switchMode(mode) {
+  state.mode = mode;
+  state.currentIdx = 0;
+  state.correctCount = 0;
+  state.wrongCount = 0;
+  state.streak = 0;
+  state.maxStreak = 0;
+  state.feedbackShown = false;
+  state.isCorrect = false;
+  state.wrongAttempts = 0;
+  state.sentenceDone = new Set();
+  state.sentences = QUESTION_BANKS[mode].sentences;
+  saveState();
+  
+  $$('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  showPicker();
+}
+
+function handleKeydown(e) {
+  const input = $('#inputField');
+  
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (state.feedbackShown && !state.isCorrect) {
+      handleSubmit();
+    } else if (!state.feedbackShown) {
+      handleSubmit();
+    } else if (state.isCorrect) {
+      nextSentence();
+    }
+  } else if (e.key === ' ' && document.activeElement !== input) {
+    // Space for play - only when input is NOT focused
+    e.preventDefault();
+    handlePlay();
+  } else if (e.key === 'ArrowRight' && state.isCorrect) {
+    e.preventDefault();
+    nextSentence();
+  }
+}
+
+// ========== MODE SWITCH ==========
+$$('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+});
+
+// ========== INIT ==========
+state.sentences = QUESTION_BANKS[state.mode].sentences;
+
+// Restore saved mode selection on buttons
+$$('.mode-btn').forEach(b => {
+  if (b.dataset.mode === state.mode) b.classList.add('active');
+  else b.classList.remove('active');
+});
+
+if (state.sentenceDone.size > 0) {
+  // User has progress - restore it
+  // All sentences done? Reset correctly
+  if (state.sentenceDone.size >= state.sentences.length) {
+    state.sentenceDone = new Set();
+    state.correctCount = 0;
+    state.wrongCount = 0;
+    state.maxStreak = 0;
+    saveState();
+  }
+}
+
+showPicker();
+updateStats();
+</script>
+</body>
+</html>
